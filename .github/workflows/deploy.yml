@@ -1,6 +1,6 @@
 env:
-  REPO_NAME: cloudrun-repo
-  IMAGE_NAME: cloudrun-app
+  REPO_NAME: hello-app
+  IMAGE_NAME: github-action-app
 
 name: Deploy to Cloud Run
 
