@@ -1,12 +1,13 @@
 env:
-  REPO_NAME: hello-app
-  IMAGE_NAME: github-action-app
+  REPO_NAME: cloudrun-repo
+  IMAGE_NAME: cloudrun-app
 
 name: Deploy to Cloud Run
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:  # allows manual trigger
 
 jobs:
   deploy:
@@ -17,28 +18,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ✅ Step 1: Authenticate with GCP
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # ✅ Step 2: Set up gcloud CLI
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          install_components: 'beta'
 
+      # ✅ Step 3: Configure Docker auth for Artifact Registry
       - name: Configure Docker authentication
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
 
+      # ✅ Step 4: Build Docker image
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloudrun-repo/cloudrun-app:$GITHUB_SHA .
+          docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:$GITHUB_SHA .
 
-      - name: Push Docker image to Artifact Registry
+      # ✅ Step 5: Push Docker image
+      - name: Push Docker image
         run: |
-          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloudrun-repo/cloudrun-app:$GITHUB_SHA
+          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:$GITHUB_SHA
 
+      # ✅ Step 6: Deploy to Cloud Run
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy cloudrun-app \
-            --IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          gcloud run deploy ${{ env.IMAGE_NAME }} \
+            --image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:$GITHUB_SHA \
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated
