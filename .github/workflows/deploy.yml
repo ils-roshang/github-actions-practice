@@ -1,3 +1,7 @@
+env:
+  REPO_NAME: hello-app
+  IMAGE_NAME: github-action-app
+
 name: Deploy to Cloud Run
 
 on:
@@ -34,7 +38,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy cloudrun-app \
-            --image ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloudrun-repo/cloudrun-app:$GITHUB_SHA \
+            --IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated
