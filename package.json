@@ -1,12 +1,11 @@
 {
-  "name": "github-actions-practice",
+  "name": "gcp-cloudrun-app",
   "version": "1.0.0",
-  "description": "Simple Node.js project for GitHub Actions practice",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "start": "node index.js"
   },
-  "devDependencies": {
-    "jest": "^29.7.0"
+  "dependencies": {
+    "express": "^4.18.2"
   }
 }
