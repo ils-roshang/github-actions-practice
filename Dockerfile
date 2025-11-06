@@ -1,19 +1,36 @@
-# Use Node.js LTS version
-FROM node:20
+# --- Stage 1: Build dependencies ---
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy only package files first (better build cache)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies (production only)
+RUN npm ci --only=production
 
-# Copy rest of app
+# Copy the rest of the source code
 COPY . .
 
-# Expose port
+# --- Stage 2: Run the application securely ---
+FROM node:20-alpine
+
+# Create a non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy only necessary files from builder stage
+COPY --from=builder /app ./
+
+# Set secure permissions
+RUN chown -R appuser:appgroup /app
+
+# Run as non-root user
+USER appuser
+
+# Expose app port
 EXPOSE 8080
 
 # Start the app
