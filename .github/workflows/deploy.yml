@@ -2,50 +2,91 @@ env:
   REPO_NAME: hello-app
   IMAGE_NAME: github-action-app
 
-name: Deploy to Cloud Run
+name: Secure Build & Deploy to Cloud Run
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # allows manual trigger
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
-    name: Build and Deploy to Cloud Run
+    name: Security Scan + Build + Deploy
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      security-events: write
+
     steps:
+      # 🧩 Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ✅ Step 1: Authenticate with GCP
+      # 🧠 Step 2: CodeQL Code Vulnerability Scan
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript,python
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v3
+
+      # 📦 Step 3: Dependency Vulnerability Scan
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+      # ✅ Step 4: Authenticate with GCP
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # ✅ Step 2: Set up gcloud CLI
+      # ✅ Step 5: Set up gcloud CLI
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           install_components: 'beta'
 
-      # ✅ Step 3: Configure Docker auth for Artifact Registry
+      # ✅ Step 6: Configure Docker auth for Artifact Registry
       - name: Configure Docker authentication
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # ✅ Step 4: Build Docker image
+      # 🐳 Step 7: Build Docker image
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:$GITHUB_SHA .
 
-      # ✅ Step 5: Push Docker image
+      # 🔍 Step 8: Scan Docker image for vulnerabilities
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:$GITHUB_SHA
+          format: 'table'
+          vuln-type: 'os,library'
+          exit-code: '1'   # fail the job if vulnerabilities are found
+          ignore-unfixed: true
+
+      # 🏗️ Step 9: Push Docker image
       - name: Push Docker image
         run: |
           docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:$GITHUB_SHA
 
-      # ✅ Step 6: Deploy to Cloud Run
+      # 🚀 Step 10: Deploy to Cloud Run
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.IMAGE_NAME }} \
