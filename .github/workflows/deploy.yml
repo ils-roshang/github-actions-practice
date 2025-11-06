@@ -56,6 +56,10 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      # 🧹 Step 4.5: Cleanup any credential files created by auth
+      - name: Cleanup any credential files
+        run: rm -f *.json
 
       # ✅ Step 5: Set up gcloud CLI
       - name: Set up gcloud CLI
