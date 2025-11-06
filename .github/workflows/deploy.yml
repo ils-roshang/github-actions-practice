@@ -87,10 +87,6 @@ jobs:
       - name: Push Docker image
         run: |
           docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-      # ✅ Step 8: Clean up sensitive credential files
-      - name: Cleanup any credential files
-        if: always()  # ensures cleanup runs even if job fails
-        run: rm -f *.json
 
       # 🚀 Step 10: Deploy to Cloud Run
       - name: Deploy to Cloud Run
@@ -100,3 +96,8 @@ jobs:
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated
+
+     # ✅ Step 8: Clean up sensitive credential files
+      - name: Cleanup any credential files
+        if: always()  # ensures cleanup runs even if job fails
+        run: rm -f *.json
