@@ -4,34 +4,38 @@ FROM node:20-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy only package files first (better build cache)
+# Copy package files first (to leverage Docker cache efficiently)
 COPY package*.json ./
 
-# Install dependencies (production only)
-RUN npm ci --only=production
+# Force clean dependency install (no audit, no cache issues)
+RUN npm ci --omit=dev --no-audit --prefer-online
 
-# Copy the rest of the source code
+# Copy application source code
 COPY . .
 
-# --- Stage 2: Run the application securely ---
+# --- Stage 2: Create minimal runtime image ---
 FROM node:20-alpine
 
-# Create a non-root user
+# Create a non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
+# Set work directory
 WORKDIR /app
 
-# Copy only necessary files from builder stage
+# Copy production files only from builder stage
 COPY --from=builder /app ./
 
-# Set secure permissions
+# Ensure proper ownership and permissions
 RUN chown -R appuser:appgroup /app
 
-# Run as non-root user
+# Use non-root user
 USER appuser
 
-# Expose app port
+# Environment configuration
+ENV NODE_ENV=production
+
+# Expose application port
 EXPOSE 8080
 
-# Start the app
+# Start the application
 CMD ["npm", "start"]
